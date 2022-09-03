@@ -654,6 +654,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
+name = "simple_bar"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50759aea8945860b7df14012f0cd1fc656c726f40ab02e150122990550bcf167"
+
+[[package]]
 name = "smallvec"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -685,6 +691,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "native-dialog",
+ "simple_bar",
 ]
 
 [[package]]
