@@ -13,18 +13,24 @@ fn main() {
         .read_line(&mut input)
         .expect("Failed to read input. Exiting program");
     input.pop();
-    if input != "1" && input != "2" { process::exit(1 )};
+    if input != "1" && input != "2" {
+        process::exit(1)
+    };
     let path = FileDialog::new()
         .set_location("~/Desktop")
         .add_filter("PNG Image", &["png"])
         .add_filter("JPEG Image", &["jpg", "jpeg"])
         .show_open_single_file()
         .unwrap();
-    let unwrapped_path = if path != None { path.unwrap() } else { process::exit(1) };
+    let unwrapped_path = if path != None {
+        path.unwrap()
+    } else {
+        process::exit(1)
+    };
     match input.as_str() {
         "1" => add_text_to_image(unwrapped_path),
         "2" => extract_text_from_image(unwrapped_path),
-        _ => ()
+        _ => (),
     }
 }
 
@@ -32,13 +38,12 @@ fn extract_text_from_image(path: PathBuf) {
     let img = ImageReader::open(path).unwrap().decode().unwrap();
     let mut binary_vector: Vec<u8> = Vec::new();
 
-
     for pixel in img.pixels() {
         let rgba = pixel.2;
         let r = rgba[0] & 0x0F;
         let g = rgba[1] & 0x0F;
         let b = rgba[2] & 0x0F;
-        binary_vector.extend_from_slice(&[r,g,b]);
+        binary_vector.extend_from_slice(&[r, g, b]);
     }
 
     while (binary_vector.len() % 2) != 0 {
@@ -51,7 +56,7 @@ fn extract_text_from_image(path: PathBuf) {
     for chunk in bytes_iter {
         let mut byte = chunk[0];
         byte = byte << 4;
-        let  mut part = chunk[1];
+        let mut part = chunk[1];
         part = part & 0x0F;
         byte = byte + part;
         assembled_vector.push(byte);
@@ -64,8 +69,6 @@ fn extract_text_from_image(path: PathBuf) {
     assembled_vector.pop();
     let s = String::from_utf8_lossy(&assembled_vector);
     println!("{}", s);
-
-
 }
 
 fn add_text_to_image(path: PathBuf) {
@@ -93,7 +96,7 @@ fn add_text_to_image(path: PathBuf) {
     match sliced_vector.len() % 3 {
         1 => sliced_vector.extend_from_slice(&[0, 0]),
         2 => sliced_vector.push(0),
-        _ => ()
+        _ => (),
     }
 
     let bytes_iter = sliced_vector.chunks(3);
