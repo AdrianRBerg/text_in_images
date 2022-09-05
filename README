@@ -1,0 +1,10 @@
+# Text in Images
+
+This is a steganography project, where through manipulating the least 4 significant bits of the pixels of an image,
+we are able to put  UTF-8/ASCII information inside an image, without changing the image too much.
+
+It allows us to create an image with embedded information that is almost undetectable, so that it can be shared around
+to distribute hidden information. It has the ability to both read and insert information, and is used with a terminal
+interface and a GUI for selecting items.
+
+It can also insert text files into images, as long as its UTF-8 or ASCII.
