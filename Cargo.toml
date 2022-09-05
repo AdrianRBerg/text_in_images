@@ -9,3 +9,6 @@ edition = "2021"
 image = "0.24.3"
 native-dialog = "0.6.3"
 simple_bar = "0.1.6"
+
+[profile.dev.package."*"]
+opt-level = 3

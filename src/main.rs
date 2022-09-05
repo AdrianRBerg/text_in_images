@@ -3,12 +3,10 @@ use image::{GenericImage, GenericImageView};
 use native_dialog::FileDialog;
 use std::fs;
 use std::io;
-use std::io::Cursor;
 use std::path::PathBuf;
 use std::process;
 use std::{thread, time};
-use simple_bar::ProgressBar;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn main() {
     let path = FileDialog::new()
@@ -34,10 +32,9 @@ fn add_text_to_image(path: PathBuf) {
         .as_millis();
     for byte in binary_vector {
         // Get the 4 most significant bits
-        sliced_vector.push(byte & 0xF0);
+        sliced_vector.push((byte & 0xF0) >> 4);
         // Shift to the left to get least significant bits in the most significant part
-        let x = byte << 4;
-        sliced_vector.push(x);
+        sliced_vector.push(byte & 0x0F);
     }
     let time2 = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -45,44 +42,42 @@ fn add_text_to_image(path: PathBuf) {
         .as_millis();
     println!("Time taken: {}", time2 - time1);
     println!("Starting to read image. ");
+    let time3 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis();
     let img = ImageReader::open(path).unwrap().decode().unwrap();
+    let time4 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis();
     println!("Read image into file, cloning...");
     let mut new_img = img.clone();
+    let time5 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis();
     println!("Cloned. \n");
+    println!("Time taken to load image: {} ms\nTime taken to clone image: {}", time4 - time3, time5 - time4);
     let dimensions = img.dimensions();
     if (dimensions.0 * dimensions.1) < sliced_vector.len() as u32 {
         println!("Too much text for the given image.");
         process::exit(1);
     }
-    let mut should_break: bool = false;
-    println!("Starting to apply the vector to the image");
-    let mut bar = ProgressBar::default(sliced_vector.len() as u32, 50);
-    for mut pixel in img.pixels() {
-        if sliced_vector.len() < 3 {
-            println!("{:?}", sliced_vector);
-            sliced_vector.resize(3, 0);
-            println!("{:?}", sliced_vector);
-            should_break = true;
-        }
-
-        let bytes = (
-            sliced_vector[0] >> 4,
-            sliced_vector[1] >> 4,
-            sliced_vector[2] >> 4,
-        );
-        sliced_vector.remove(0);
-        sliced_vector.remove(0);
-        sliced_vector.remove(0);
-
+    println!("Starting to embed the text into the image");
+    println!("{}", sliced_vector.len() % 3);
+    match sliced_vector.len() {
+        1 => sliced_vector.extend_from_slice(&[0, 0]),
+        2 => sliced_vector.push(0),
+        _ => ()
+    }
+    let bytes_iter = sliced_vector.chunks(3);
+    for (mut pixel, chunk) in img.pixels().zip(bytes_iter) {
         let mut rgba = pixel.2; // Grabs the RGBA thingy
-        rgba[0] = (rgba[0] & 0xF0) + bytes.0;
-        rgba[1] = (rgba[1] & 0xF0) + bytes.1;
-        rgba[2] = (rgba[2] & 0xF0) + bytes.1;
+        rgba[0] = (rgba[0] & 0xF0) + chunk[0];
+        rgba[1] = (rgba[1] & 0xF0) + chunk[1];
+        rgba[2] = (rgba[2] & 0xF0) + chunk[2];
         new_img.put_pixel(pixel.0, pixel.1, rgba);
-        bar.next();
-        if should_break == true {
-            break;
-        }
     }
     new_img.save("finished.png").unwrap();
 }
@@ -94,7 +89,7 @@ fn get_binary_vector() -> Vec<u8> {
     io::stdin()
         .read_line(&mut choice)
         .expect("Failed to read input. Exiting program");
-    choice.pop();
+    choice.pop(); // Remove newline
     let mut bytes_vector = match choice.as_str() {
         // Clean and simple
         "1" => {
@@ -116,6 +111,7 @@ fn get_binary_vector() -> Vec<u8> {
                 .unwrap()
                 .expect("Not a valid path. Exiting program");
             let input = fs::read(path).expect("Should have been able to read the file");
+            println!("WARNING: If the read file is not UTF-8 or ASCII compliant, this MAY fail.\n");
             println!("Successfully read file into vector. Size: {}", input.len());
             input
         }
