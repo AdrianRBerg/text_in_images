@@ -1,10 +1,11 @@
-use image::io::Reader as ImageReader;
-use image::{GenericImage, GenericImageView};
-use native_dialog::FileDialog;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process;
+
+use image::{GenericImage, GenericImageView};
+use image::io::Reader as ImageReader;
+use native_dialog::FileDialog;
 
 fn main() {
     println!("Choose an option:\n1) Read input into image\n2) Extract text from image");
@@ -14,28 +15,30 @@ fn main() {
         .expect("Failed to read input. Exiting program");
     input.pop();
     if input != "1" && input != "2" {
-        process::exit(1)
+        println!("Invalid option. Exiting.");
+        process::exit(1);
     };
     let path = FileDialog::new()
-        .set_location("~/Desktop")
         .add_filter("PNG Image", &["png"])
         .add_filter("JPEG Image", &["jpg", "jpeg"])
         .show_open_single_file()
-        .unwrap();
+        .expect("Invalid path. Exiting program");
+
     let unwrapped_path = if path != None {
-        path.unwrap()
+        path.expect("Unexpected error in path.")
     } else {
+        println!("Invalid path. Exiting.");
         process::exit(1)
     };
     match input.as_str() {
         "1" => add_text_to_image(unwrapped_path),
         "2" => extract_text_from_image(unwrapped_path),
-        _ => (),
+        _ => println!("This error shouldn't be possible."),
     }
 }
 
 fn extract_text_from_image(path: PathBuf) {
-    let img = ImageReader::open(path).unwrap().decode().unwrap();
+    let img = ImageReader::open(path).expect("Error in opening the image").decode().expect("Error in decoding the image");
     let mut binary_vector: Vec<u8> = Vec::new();
 
     for pixel in img.pixels() {
@@ -81,13 +84,14 @@ fn add_text_to_image(path: PathBuf) {
         sliced_vector.push(byte & 0x0F);
     }
     println!("Starting to read image. ");
-    let img = ImageReader::open(path).unwrap().decode().unwrap();
+    let img = ImageReader::open(path).expect("Error in opening the image").decode().expect("Error in decoding the image");
     println!("Read image into file, cloning...");
     let mut new_img = img.clone();
 
     println!("Cloned. \n");
     let dimensions = img.dimensions();
-    if (dimensions.0 * dimensions.1) < sliced_vector.len() as u32 {
+    //
+    if ((dimensions.0 * dimensions.1) as f32 * 1.5) < sliced_vector.len() as f32 {
         println!("Too much text for the given image.");
         process::exit(1);
     }
@@ -107,7 +111,7 @@ fn add_text_to_image(path: PathBuf) {
         rgba[2] = (rgba[2] & 0xF0) + chunk[2];
         new_img.put_pixel(pixel.0, pixel.1, rgba);
     }
-    new_img.save("finished.png").unwrap();
+    new_img.save("finished.png").expect("Failed to save image");
     println!("Successfully saved image");
 }
 
@@ -135,7 +139,6 @@ fn get_binary_vector() -> Vec<u8> {
         "2" => {
             println!("Select a text file");
             let path = FileDialog::new()
-                .set_location("~/Desktop")
                 .show_open_single_file()
                 .unwrap()
                 .expect("Not a valid path. Exiting program");
