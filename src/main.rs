@@ -5,74 +5,99 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process;
-use std::{thread, time};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn main() {
+    println!("Choose an option:\n1) Read input into image\n2) Extract text from image");
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read input. Exiting program");
+    input.pop();
+    if input != "1" && input != "2" { process::exit(1 )};
     let path = FileDialog::new()
         .set_location("~/Desktop")
         .add_filter("PNG Image", &["png"])
         .add_filter("JPEG Image", &["jpg", "jpeg"])
         .show_open_single_file()
         .unwrap();
-    println!("{:?}", path);
-    match path {
-        Some(path) => add_text_to_image(path),
-        None => process::exit(1),
-    };
+    let unwrapped_path = if path != None { path.unwrap() } else { process::exit(1) };
+    match input.as_str() {
+        "1" => add_text_to_image(unwrapped_path),
+        "2" => extract_text_from_image(unwrapped_path),
+        _ => ()
+    }
+}
+
+fn extract_text_from_image(path: PathBuf) {
+    let img = ImageReader::open(path).unwrap().decode().unwrap();
+    let mut binary_vector: Vec<u8> = Vec::new();
+
+
+    for pixel in img.pixels() {
+        let rgba = pixel.2;
+        let r = rgba[0] & 0x0F;
+        let g = rgba[1] & 0x0F;
+        let b = rgba[2] & 0x0F;
+        binary_vector.extend_from_slice(&[r,g,b]);
+    }
+
+    while (binary_vector.len() % 2) != 0 {
+        binary_vector.push(0b00000000);
+    }
+    let mut assembled_vector: Vec<u8> = Vec::with_capacity(binary_vector.len() / 2);
+    let bytes_iter = binary_vector.chunks(2);
+    // Combines chunks of bytes into full bytes since
+    // in this state they only exist in half_states
+    for chunk in bytes_iter {
+        let mut byte = chunk[0];
+        byte = byte << 4;
+        let  mut part = chunk[1];
+        part = part & 0x0F;
+        byte = byte + part;
+        assembled_vector.push(byte);
+        if byte == 0b00000000 {
+            break;
+        }
+    }
+
+    // Remove lone 0b00000000
+    assembled_vector.pop();
+    let s = String::from_utf8_lossy(&assembled_vector);
+    println!("{}", s);
+
+
 }
 
 fn add_text_to_image(path: PathBuf) {
     let binary_vector = get_binary_vector();
     let mut sliced_vector: Vec<u8> = Vec::with_capacity(binary_vector.len() * 2);
-    println!("{}", binary_vector.len());
-    let time1 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_millis();
     for byte in binary_vector {
         // Get the 4 most significant bits
         sliced_vector.push((byte & 0xF0) >> 4);
         // Shift to the left to get least significant bits in the most significant part
         sliced_vector.push(byte & 0x0F);
     }
-    let time2 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_millis();
-    println!("Time taken: {}", time2 - time1);
     println!("Starting to read image. ");
-    let time3 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_millis();
     let img = ImageReader::open(path).unwrap().decode().unwrap();
-    let time4 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_millis();
     println!("Read image into file, cloning...");
     let mut new_img = img.clone();
-    let time5 = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_millis();
+
     println!("Cloned. \n");
-    println!("Time taken to load image: {} ms\nTime taken to clone image: {}", time4 - time3, time5 - time4);
     let dimensions = img.dimensions();
     if (dimensions.0 * dimensions.1) < sliced_vector.len() as u32 {
         println!("Too much text for the given image.");
         process::exit(1);
     }
     println!("Starting to embed the text into the image");
-    println!("{}", sliced_vector.len() % 3);
-    match sliced_vector.len() {
+
+    match sliced_vector.len() % 3 {
         1 => sliced_vector.extend_from_slice(&[0, 0]),
         2 => sliced_vector.push(0),
         _ => ()
     }
+
     let bytes_iter = sliced_vector.chunks(3);
-    for (mut pixel, chunk) in img.pixels().zip(bytes_iter) {
+    for (pixel, chunk) in img.pixels().zip(bytes_iter) {
         let mut rgba = pixel.2; // Grabs the RGBA thingy
         rgba[0] = (rgba[0] & 0xF0) + chunk[0];
         rgba[1] = (rgba[1] & 0xF0) + chunk[1];
@@ -80,6 +105,7 @@ fn add_text_to_image(path: PathBuf) {
         new_img.put_pixel(pixel.0, pixel.1, rgba);
     }
     new_img.save("finished.png").unwrap();
+    println!("Successfully saved image");
 }
 
 /// Get binary input from the user, either by file or text in console.
